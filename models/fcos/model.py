@@ -1,12 +1,3 @@
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras.initializers import RandomNormal, Constant
-from tensorflow.keras.layers import (Input,
-                                     ReLU,
-                                     UpSampling2D,
-                                     Add)
-from ..blocks import conv_block
-
 class FCOS:
     def __init__(self, config):
         self._validate_config(config)
@@ -131,9 +122,10 @@ class FCOS:
             for i in range(3, 8):
                 feature = self._pyramid_features['P{}'.format(i)]
                 _cls_head_logits = self._classification_head(feature)
+                _reg_head_logits = self._regression_head(feature)
                 self._classification_logits.append(_cls_head_logits[0][0])
                 self._centerness_logits.append(_cls_head_logits[0][1])
-                self._regression_logits.append(self._regression_head(feature))
+                self._regression_logits.append(_reg_head_logits)
 
             _image_input = self._backbone.input
             outputs = [self._classification_logits,
@@ -141,3 +133,28 @@ class FCOS:
                        self._regression_logits]
             self.model = tf.keras.Model(
                 inputs=[_image_input], outputs=outputs, name='FCOS')
+
+    @staticmethod
+    def _classification_loss(labels, logits):
+        # TODO
+        pass
+
+    @staticmethod
+    def _centerness_loss(labels, logits):
+        # TODO
+        pass
+
+    @staticmethod
+    def _regression_loss(labels, logits):
+        # TODO
+        pass
+
+    @staticmethod
+    def _per_level_loss(labels, logits):
+        # TODO
+        pass
+
+    @staticmethod
+    def _compute_total_loss(labels, logits):
+        # TODO
+        pass
