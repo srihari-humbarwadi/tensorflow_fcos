@@ -103,6 +103,11 @@ class FCOS:
                               name='classification_head')
 
     def _get_regression_head(self):
+        '''
+            From the FCOS paper, "since the regression targets are always positive
+            we employ exp(x) to map any real number to (0, ∞) on the top of the
+            regression branch"
+        '''
         kernel_init = RandomNormal(0.0, 0.01)
         input_layer = Input(shape=[None, None, 256])
         x = input_layer
@@ -112,6 +117,7 @@ class FCOS:
                            name_prefix='r_head_{}'.format(i))
         regression_logits = conv_block(x, 4, 3, kernel_init=kernel_init,
                                        bn_act=False, name_prefix='reg_logits')
+        regression_logits = Lambda(tf.exp, name='reg_logits')(regression_logits)
         return tf.keras.Model(inputs=[input_layer],
                               outputs=[regression_logits],
                               name='regression_head')
@@ -167,4 +173,4 @@ class FCOS:
     @staticmethod
     def _compute_total_loss(labels, logits):
         #TODO
-        pass    
+        pass       
