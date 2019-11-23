@@ -5,7 +5,7 @@ from tensorflow.keras.layers import (Input,
                                      ReLU,
                                      UpSampling2D,
                                      Add)
-from ..blocks import conv_block
+from ..blocks import conv_block, upsample_like
 
 
 class FCOS:
@@ -56,16 +56,13 @@ class FCOS:
 
             M5 = conv_block(C5, 256, 1, bn_act=False, name_prefix='C5')
             P5 = conv_block(M5, 256, 3, bn_act=False, name_prefix='P5')
-            M5_upsampled = UpSampling2D(size=(2, 2),
-                                        interpolation='nearest',
-                                        name='M5_upsampled')(M5)
+            M5_upsampled = upsample_like(M5, C4, name='M5_upsampled')
 
             M4 = conv_block(C4, 256, 1, bn_act=False, name_prefix='C4')
             M4 = tf.keras.layers.Add(name='M4_M5_add')([M4, M5_upsampled])
             P4 = conv_block(M4, 256, 3, bn_act=False, name_prefix='P4')
-            M4_upsampled = UpSampling2D(size=(2, 2),
-                                        interpolation='nearest',
-                                        name='M4_upsampled')(M4)
+            M4_upsampled = upsample_like(M4, C3, name='M4_upsampled')
+
 
             M3 = conv_block(C3, 256, 1, bn_act=False, name_prefix='C3')
             P3 = Add(name='M3_M4_add')([M3, M4_upsampled])
@@ -124,11 +121,11 @@ class FCOS:
             print('****Building FCOS')
             self._classification_head = self._get_classification_head()
             self._regression_head = self._get_regression_head()
-
+            
             self._classification_logits = []
             self._centerness_logits = []
             self._regression_logits = []
-
+            
             for i in range(3, 8):
                 feature = self._pyramid_features['P{}'.format(i)]
                 _cls_head_logits = self._classification_head(feature)
@@ -136,35 +133,38 @@ class FCOS:
                 self._classification_logits.append(_cls_head_logits[0][0])
                 self._centerness_logits.append(_cls_head_logits[0][1])
                 self._regression_logits.append(_reg_head_logits)
-
+                
             _image_input = self._backbone.input
             outputs = [self._classification_logits,
-                       self._centerness_logits,
+                       self._centerness_logits, 
                        self._regression_logits]
-            self.model = tf.keras.Model(
-                inputs=[_image_input], outputs=outputs, name='FCOS')
+            self.model = tf.keras.Model(inputs=[_image_input], outputs=outputs, name='FCOS')
+
 
     @staticmethod
     def _classification_loss(labels, logits):
-        # TODO
+        #TODO
         pass
 
+    
     @staticmethod
     def _centerness_loss(labels, logits):
-        # TODO
+        #TODO
         pass
 
+    
     @staticmethod
     def _regression_loss(labels, logits):
-        # TODO
+        #TODO
         pass
-
+    
+            
     @staticmethod
     def _per_level_loss(labels, logits):
-        # TODO
+        #TODO
         pass
-
+    
     @staticmethod
     def _compute_total_loss(labels, logits):
-        # TODO
-        pass
+        #TODO
+        pass    
