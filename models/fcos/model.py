@@ -2,8 +2,10 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.initializers import RandomNormal, Constant
 from tensorflow.keras.layers import (Input,
+                                     Concatenate,
+                                     Lambda,
+                                     Reshape,
                                      ReLU,
-                                     UpSampling2D,
                                      Add)
 from ..blocks import conv_block, upsample_like
 
@@ -63,7 +65,6 @@ class FCOS:
             P4 = conv_block(M4, 256, 3, bn_act=False, name_prefix='P4')
             M4_upsampled = upsample_like(M4, C3, name='M4_upsampled')
 
-
             M3 = conv_block(C3, 256, 1, bn_act=False, name_prefix='C3')
             P3 = Add(name='M3_M4_add')([M3, M4_upsampled])
             P3 = conv_block(P3, 256, 3, bn_act=False, name_prefix='P3')
@@ -97,6 +98,10 @@ class FCOS:
         centerness_logits = conv_block(x, 1, 3,
                                        kernel_init=kernel_init, bn_act=False,
                                        name_prefix='ctr_logits')
+        classification_logits = Reshape(
+            target_shape=[-1, self.num_classes])(classification_logits)
+        centerness_logits = Reshape(target_shape=[-1, 1])(centerness_logits)
+
         outputs = [classification_logits, centerness_logits]
         return tf.keras.Model(inputs=[input_layer],
                               outputs=[outputs],
@@ -117,7 +122,9 @@ class FCOS:
                            name_prefix='r_head_{}'.format(i))
         regression_logits = conv_block(x, 4, 3, kernel_init=kernel_init,
                                        bn_act=False, name_prefix='reg_logits')
-        regression_logits = Lambda(tf.exp, name='reg_logits')(regression_logits)
+        regression_logits = Lambda(
+            tf.exp, name='reg_logits')(regression_logits)
+        regression_logits = Reshape(target_shape=[-1, 4])(regression_logits)
         return tf.keras.Model(inputs=[input_layer],
                               outputs=[regression_logits],
                               name='regression_head')
@@ -127,11 +134,11 @@ class FCOS:
             print('****Building FCOS')
             self._classification_head = self._get_classification_head()
             self._regression_head = self._get_regression_head()
-            
+
             self._classification_logits = []
             self._centerness_logits = []
             self._regression_logits = []
-            
+
             for i in range(3, 8):
                 feature = self._pyramid_features['P{}'.format(i)]
                 _cls_head_logits = self._classification_head(feature)
@@ -139,38 +146,39 @@ class FCOS:
                 self._classification_logits.append(_cls_head_logits[0][0])
                 self._centerness_logits.append(_cls_head_logits[0][1])
                 self._regression_logits.append(_reg_head_logits)
-                
+
+            self._classification_logits = Concatenate(
+                axis=1,
+                name='classification_outputs')(self._classification_logits)
+            self._centerness_logits = Concatenate(
+                axis=1, name='centerness_outputs')(self._centerness_logits)
+            self._regression_logits = Concatenate(
+                axis=1, name='regression_outputs')(self._regression_logits)
+
             _image_input = self._backbone.input
             outputs = [self._classification_logits,
-                       self._centerness_logits, 
+                       self._centerness_logits,
                        self._regression_logits]
-            self.model = tf.keras.Model(inputs=[_image_input], outputs=outputs, name='FCOS')
-
+            self.model = tf.keras.Model(
+                inputs=[_image_input], outputs=outputs, name='FCOS')
+            self.model.build([self.image_height, self.image_width, 3])
 
     @staticmethod
     def _classification_loss(labels, logits):
-        #TODO
+        # TODO
         pass
 
-    
     @staticmethod
     def _centerness_loss(labels, logits):
-        #TODO
+        # TODO
         pass
 
-    
     @staticmethod
     def _regression_loss(labels, logits):
-        #TODO
+        # TODO
         pass
-    
-            
-    @staticmethod
-    def _per_level_loss(labels, logits):
-        #TODO
-        pass
-    
+
     @staticmethod
     def _compute_total_loss(labels, logits):
-        #TODO
-        pass       
+        # TODO
+        pass
