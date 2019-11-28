@@ -1,7 +1,7 @@
 from tensorflow.keras.layers import (Conv2D,
                                      BatchNormalization,
                                      ReLU)
-
+import tensorflow as tf
 
 def conv_block(input_tensor=None,
                filters=None,
