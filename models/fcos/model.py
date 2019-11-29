@@ -17,6 +17,7 @@ class FCOS:
             setattr(self, attr, config[attr])
         self._build_fpn()
         self._build_model()
+        self._build_datasets()
 
     def _validate_config(self, config):
         attr_list = [
@@ -25,7 +26,9 @@ class FCOS:
             'image_height',
             'image_width',
             'num_classes',
-            'dataset',
+            'data_dir',
+            'dataset_fn',
+            'batch_size',
             'epochs',
             'learning_rate',
             'model_dir',
@@ -37,14 +40,15 @@ class FCOS:
     def _build_fpn(self):
         '''
             From the FPN paper, "To start the iteration, we simply attach a
-            1×1 convolutional layer on C5 to produce the coarsest resolution map.
-            Finally, we append a 3×3 convolution on each merged map to generate
-            the final feature map, which is to reduce the aliasing effect of
-            upsampling. This final set of feature maps is called
+            1×1 convolutional layer on C5 to produce the coarsest resolution
+            map. Finally, we append a 3×3 convolution on each merged map to
+            generate the final feature map, which is to reduce the aliasing
+            effect of upsampling. This final set of feature maps is called
             {P2, P3, P4, P5}, corresponding to {C2, C3, C4, C5} that are
             respectively of the same spatial sizes".
             From the FCOS paper, "P6 and P7 are produced by applying one
-            convolutional layer with the stride being 2 on P5 and P6, respectively".
+            convolutional layer with the stride being 2 on P5 and P6,
+            respectively".
         '''
         with self.distribute_strategy.scope():
             print('****Building FPN')
@@ -109,9 +113,9 @@ class FCOS:
 
     def _get_regression_head(self):
         '''
-            From the FCOS paper, "since the regression targets are always positive
-            we employ exp(x) to map any real number to (0, ∞) on the top of the
-            regression branch"
+            From the FCOS paper, "since the regression targets are always
+            positive we employ exp(x) to map any real number to (0, ∞) on
+            the top of the regression branch"
         '''
         kernel_init = RandomNormal(0.0, 0.01)
         input_layer = Input(shape=[None, None, 256])
@@ -162,6 +166,15 @@ class FCOS:
             self.model = tf.keras.Model(
                 inputs=[_image_input], outputs=outputs, name='FCOS')
             self.model.build([self.image_height, self.image_width, 3])
+
+    def _build_datasets(self):
+        print('****Building Datasets')
+        with self.distribute_strategy.scope():
+            self.train_dataset, self.val_dataset =  \
+                self.dataset_fn(self.image_height,
+                                self.image_width,
+                                self.data_dir,
+                                self.batch_size)
 
     @staticmethod
     def _classification_loss(labels, logits):
