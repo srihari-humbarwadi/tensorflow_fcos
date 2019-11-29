@@ -133,6 +133,10 @@ class FCOS:
                               outputs=[regression_logits],
                               name='regression_head')
 
+    def _get_predictions_decoder(self):
+        # TODO
+        pass
+
     def _build_model(self):
         with self.distribute_strategy.scope():
             print('****Building FCOS')
@@ -176,6 +180,10 @@ class FCOS:
                                 self.data_dir,
                                 self.batch_size)
 
+    def __call__(self):
+        # TODO
+        pass
+
     @staticmethod
     def _classification_loss(labels, logits):
         # TODO
@@ -188,10 +196,5 @@ class FCOS:
 
     @staticmethod
     def _regression_loss(labels, logits):
-        # TODO
-        pass
-
-    @staticmethod
-    def _compute_total_loss(labels, logits):
         # TODO
         pass
