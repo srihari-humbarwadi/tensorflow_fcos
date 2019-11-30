@@ -203,8 +203,7 @@ class FCOS:
             return f_loss
         return focal_loss
 
-    @staticmethod
-    def _centerness_loss(labels, logits):
+    def _centerness_loss(self, labels, logits):
         # TODO
         #   a) mask negative locations
         #   b) normalize loss value
@@ -212,8 +211,7 @@ class FCOS:
             labels=labels, logits=logits)
         return bce_loss
 
-    @staticmethod
-    def _regression_loss(labels, logits):
+    def _regression_loss(self, labels, logits):
         # TODO
         #   a) IOU loss
         #   b) mask negative locations
