@@ -184,10 +184,24 @@ class FCOS:
         # TODO
         pass
 
-    @staticmethod
-    def _classification_loss(labels, logits):
+    def _classification_loss(self, alpha=0.25, gamma=2):
         # TODO
-        pass
+        #   a) mask negative locations
+        #   b) normalize loss value
+        def focal_loss(y_true, y_pred):
+            y_true = tf.one_hot(
+                tf.cast(y_true, dtype=tf.int32), depth=self.num_classes + 1)
+            y_true = y_true[:, :, 1:]
+            y_pred_ = tf.sigmoid(y_pred)
+
+            at = alpha * y_true + (1 - y_true) * (1 - alpha)
+            pt = y_true * y_pred_ + (1 - y_true) * (1 - y_pred_)
+            f_loss = at * \
+                tf.pow(1 - pt, gamma) * \
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=y_true, logits=y_pred)
+            return f_loss
+        return focal_loss
 
     @staticmethod
     def _centerness_loss(labels, logits):
