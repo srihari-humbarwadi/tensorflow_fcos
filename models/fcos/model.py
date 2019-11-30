@@ -3,11 +3,11 @@ import tensorflow as tf
 from tensorflow.keras.initializers import RandomNormal, Constant
 from tensorflow.keras.layers import (Input,
                                      Concatenate,
-                                     Lambda,
                                      Reshape,
                                      ReLU,
                                      Add)
 from ..blocks import conv_block, upsample_like
+from ..custom_layers import Scale
 
 
 class FCOS:
@@ -17,7 +17,7 @@ class FCOS:
             setattr(self, attr, config[attr])
         self._build_fpn()
         self._build_model()
-        self._build_datasets()
+#         self._build_datasets()
 
     def _validate_config(self, config):
         attr_list = [
@@ -126,8 +126,6 @@ class FCOS:
                            name_prefix='r_head_{}'.format(i))
         regression_logits = conv_block(x, 4, 3, kernel_init=kernel_init,
                                        bn_act=False, name_prefix='reg_logits')
-        regression_logits = Lambda(
-            tf.exp, name='reg_logits')(regression_logits)
         regression_logits = Reshape(target_shape=[-1, 4])(regression_logits)
         return tf.keras.Model(inputs=[input_layer],
                               outputs=[regression_logits],
@@ -151,6 +149,10 @@ class FCOS:
                 feature = self._pyramid_features['P{}'.format(i)]
                 _cls_head_logits = self._classification_head(feature)
                 _reg_head_logits = self._regression_head(feature)
+                _reg_head_logits = \
+                    Scale(init_value=1.0,
+                          name='P{}_reg_outputs'.format(i))(_reg_head_logits)
+
                 self._classification_logits.append(_cls_head_logits[0][0])
                 self._centerness_logits.append(_cls_head_logits[0][1])
                 self._regression_logits.append(_reg_head_logits)
