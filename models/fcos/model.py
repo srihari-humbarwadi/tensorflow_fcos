@@ -206,9 +206,16 @@ class FCOS:
     @staticmethod
     def _centerness_loss(labels, logits):
         # TODO
-        pass
+        #   a) mask negative locations
+        #   b) normalize loss value
+        bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            labels=labels, logits=logits)
+        return bce_loss
 
     @staticmethod
     def _regression_loss(labels, logits):
         # TODO
+        #   a) IOU loss
+        #   b) mask negative locations
+        #   c) normalize loss value
         pass
