@@ -17,7 +17,7 @@ class FCOS:
             setattr(self, attr, config[attr])
         self._build_fpn()
         self._build_model()
-#         self._build_datasets()
+        self._build_datasets()
 
     def _validate_config(self, config):
         attr_list = [
