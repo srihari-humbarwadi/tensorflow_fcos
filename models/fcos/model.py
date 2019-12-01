@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.initializers import RandomNormal, Constant
+from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.layers import (Input,
                                      Concatenate,
                                      Reshape,
@@ -18,6 +19,8 @@ class FCOS:
         self._build_fpn()
         self._build_model()
         self._build_datasets()
+        self._build_optimizer()
+        self._build_callbacks()
 
     def _validate_config(self, config):
         attr_list = [
@@ -182,6 +185,20 @@ class FCOS:
                                 self.data_dir,
                                 self.batch_size)
 
+    def _build_callbacks(self):
+        print('****Setting Up Callbacks')
+        self.callbacks = [
+            TensorBoard(log_dir=self.tensorboard_log_dir),
+            ModelCheckpoint(filepath=self.model_dir + '/ckpt-{epoch:02d}',
+                            monitor='val_loss',
+                            save_weights_only=True,
+                            save_best_only=True)
+        ]
+
+    def _build_optimizer(self):
+        print('****Setting Up Optimizer')
+        self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate)
+
     def __call__(self):
         # TODO
         pass
@@ -219,3 +236,15 @@ class FCOS:
         #   b) mask negative locations
         #   c) normalize loss value
         pass
+
+    def train(self):
+        loss_dict = {
+            'classification_outputs': self._classification_loss(alpha=0.25,
+                                                                gamma=2),
+            'centerness_outputs': self._centerness_loss,
+            'regression_outputs': self._regression_loss
+        }
+        with self.distribute_strategy.scope():
+            self.model.compile(optimizer=self.optimizer,
+                               loss=loss_dict)
+            # self.model.fit(...)
