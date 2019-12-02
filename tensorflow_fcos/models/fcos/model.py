@@ -7,8 +7,8 @@ from tensorflow.keras.layers import (Input,
                                      Reshape,
                                      ReLU,
                                      Add)
-from ..blocks import conv_block, upsample_like
-from ..custom_layers import Scale
+from models.blocks import conv_block, upsample_like
+from models.custom_layers import Scale
 
 
 class FCOS:
@@ -39,6 +39,8 @@ class FCOS:
         ]
         for attr in attr_list:
             assert attr in config, 'Missing {} in config'.format(attr)
+        print('****Initializing FCOS with the following config')
+        print(config)
 
     def _build_fpn(self):
         '''
@@ -175,11 +177,15 @@ class FCOS:
     def _build_datasets(self):
         print('****Building Datasets')
         with self.distribute_strategy.scope():
-            self.train_dataset, self.val_dataset =  \
+            self.train_dataset, self.val_dataset, \
+                num_train_images, num_val_images =  \
                 self.dataset_fn(self.image_height,
                                 self.image_width,
                                 self.data_dir,
                                 self.batch_size)
+
+            self.train_steps = num_train_images // self.batch_size
+            self.val_steps = num_val_images // self.batch_size
 
     def _build_callbacks(self):
         print('****Setting Up Callbacks')
@@ -239,4 +245,10 @@ class FCOS:
         with self.distribute_strategy.scope():
             self.model.compile(optimizer=self.optimizer,
                                loss=loss_dict)
-            # self.model.fit(...)
+            self.model.fit(self.train_dataset,
+                           epochs=self.epochs,
+                           steps_per_epoch=self.training_steps,
+                           validation_data=self.val_dataset,
+                           validation_steps=self.val_steps,
+                           validation_freq=2,
+                           callbacks=self.callbacks)

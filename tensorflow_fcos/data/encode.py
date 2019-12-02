@@ -1,5 +1,5 @@
 import tensorflow as tf
-from .tf_record_parser import parse_example
+from data.tf_record_parser import parse_example
 
 
 @tf.function

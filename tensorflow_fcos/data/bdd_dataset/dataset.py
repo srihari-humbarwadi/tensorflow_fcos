@@ -1,5 +1,5 @@
 import tensorflow as tf
-from ..encode import load_data
+from data.encode import load_data
 
 
 def create_dataset(H, W, tf_records_pattern, batch_size):
@@ -27,4 +27,6 @@ def dataset_fn(H, W, data_dir, batch_size):
         create_dataset(H, W, train_tf_records_pattern, batch_size)
     val_dataset = \
         create_dataset(H, W, val_tf_records_pattern, batch_size)
-    return train_dataset, val_dataset
+    num_train_images = 70000
+    num_val_images = 10000
+    return train_dataset, val_dataset, num_train_images, num_val_images

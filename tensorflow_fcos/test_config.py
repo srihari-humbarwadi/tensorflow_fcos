@@ -1,4 +1,4 @@
-from data.bdd_dataset import dataset_fn
+from data.bdd_dataset.dataset import dataset_fn
 from models.fcos import FCOS
 import os
 import tensorflow as tf
@@ -20,8 +20,8 @@ if __name__ == '__main__':
         'batch_size': 4,
         'epochs': 250,
         'learning_rate': 1e-4,
-        'model_dir': 'model_files',
-        'tensorboard_log_dir': 'logs'
+        'model_dir': './model_files',
+        'tensorboard_log_dir': './logs'
     }
 
     fcos_model = FCOS(config)
