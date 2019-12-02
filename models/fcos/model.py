@@ -8,7 +8,7 @@ from tensorflow.keras.layers import (Input,
                                      ReLU,
                                      Add)
 from ..blocks import conv_block, upsample_like
-from ..custom_layers import Scale, Decode
+from ..custom_layers import Scale
 
 
 class FCOS:
