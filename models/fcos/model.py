@@ -8,7 +8,7 @@ from tensorflow.keras.layers import (Input,
                                      ReLU,
                                      Add)
 from ..blocks import conv_block, upsample_like
-from ..custom_layers import Scale
+from ..custom_layers import Scale, Decode
 
 
 class FCOS:
@@ -134,10 +134,6 @@ class FCOS:
                               outputs=[regression_logits],
                               name='regression_head')
 
-    def _get_predictions_decoder(self):
-        # TODO
-        pass
-
     def _build_model(self):
         with self.distribute_strategy.scope():
             print('****Building FCOS')
@@ -198,10 +194,6 @@ class FCOS:
     def _build_optimizer(self):
         print('****Setting Up Optimizer')
         self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate)
-
-    def __call__(self):
-        # TODO
-        pass
 
     def _classification_loss(self, alpha=0.25, gamma=2):
         # TODO
