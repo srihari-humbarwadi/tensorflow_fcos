@@ -1,4 +1,5 @@
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -6,9 +7,9 @@ def imshow(image):
     plt.figure(figsize=(16, 9))
     plt.axis('off')
     plt.imshow(image)
-    
-    
-def draw_boxes_cv2(image, bbox_list, model_input_shape=[H, W]):
+
+
+def draw_boxes_cv2(image, bbox_list, H, W):
     img = np.uint8(image).copy()
     bbox_list = np.array(bbox_list, dtype=np.int32)
     h, w = img.shape[:2]
