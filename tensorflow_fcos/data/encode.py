@@ -173,11 +173,9 @@ def compute_targets(H, W, labels):
     return classification_target, centerness_target, regression_target
 
 
-def load_data(input_shape):
-    h, w = input_shape
-
+def load_data(h, w):
     @tf.function
-    def load_data_(example_proto, input_shape=input_shape):
+    def load_data_(example_proto):
         image, boxes_, class_ids = parse_example(example_proto)
         image.set_shape([None, None, 3])
         image = tf.image.resize(image, size=[h, w])
@@ -191,5 +189,6 @@ def load_data(input_shape):
         label = tf.concat([boxes, class_ids], axis=-1)
         classification_target, centerness_target, regression_target = \
             compute_targets(h, w, label)
-        return image, (classification_target, centerness_target, regression_target)
+        return image, \
+            (classification_target, centerness_target, regression_target)
     return load_data_
