@@ -12,7 +12,7 @@ def create_dataset(H, W, tf_records_pattern, batch_size):
                                      block_length=16,
                                      num_parallel_calls=autotune)
     dataset = dataset.map(
-        load_data([H, W]), num_parallel_calls=autotune)
+        load_data(H, W), num_parallel_calls=autotune)
     dataset = dataset.shuffle(512)
     dataset = dataset.batch(batch_size, drop_remainder=True).repeat()
     dataset = dataset.prefetch(autotune)
