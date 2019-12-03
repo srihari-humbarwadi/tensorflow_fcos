@@ -3,6 +3,7 @@ from models.fcos import FCOS
 import os
 import tensorflow as tf
 
+
 print('TensorFlow:', tf.__version__)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 strategy = tf.distribute.OneDeviceStrategy(device='/cpu:0')
