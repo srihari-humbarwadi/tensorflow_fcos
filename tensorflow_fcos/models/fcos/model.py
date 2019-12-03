@@ -9,6 +9,7 @@ from tensorflow.keras.layers import (Input,
                                      Add)
 from models.blocks import conv_block, upsample_like
 from models.custom_layers import Scale
+from pprint import pprint
 
 
 class FCOS:
@@ -39,8 +40,8 @@ class FCOS:
         ]
         for attr in attr_list:
             assert attr in config, 'Missing {} in config'.format(attr)
-        print('****Initializing FCOS with the following config')
-        print(config)
+        pprint('****Initializing FCOS with the following config')
+        pprint(config)
 
     def _build_fpn(self):
         '''
@@ -56,7 +57,7 @@ class FCOS:
             respectively".
         '''
         with self.distribute_strategy.scope():
-            print('****Building FPN')
+            pprint('****Building FPN')
             self._backbone = tf.keras.applications.ResNet50V2(
                 input_shape=[self.image_height, self.image_width, 3],
                 weights='imagenet',
@@ -138,7 +139,7 @@ class FCOS:
 
     def _build_model(self):
         with self.distribute_strategy.scope():
-            print('****Building FCOS')
+            pprint('****Building FCOS')
             self._classification_head = self._get_classification_head()
             self._regression_head = self._get_regression_head()
 
@@ -175,7 +176,7 @@ class FCOS:
             self.model.build([self.image_height, self.image_width, 3])
 
     def _build_datasets(self):
-        print('****Building Datasets')
+        pprint('****Building Datasets')
         with self.distribute_strategy.scope():
             self.train_dataset, self.val_dataset, \
                 num_train_images, num_val_images =  \
@@ -188,7 +189,7 @@ class FCOS:
             self.val_steps = num_val_images // self.batch_size
 
     def _build_callbacks(self):
-        print('****Setting Up Callbacks')
+        pprint('****Setting Up Callbacks')
         self.callbacks = [
             TensorBoard(log_dir=self.tensorboard_log_dir),
             ModelCheckpoint(filepath=self.model_dir + '/ckpt-{epoch:02d}',
@@ -198,7 +199,7 @@ class FCOS:
         ]
 
     def _build_optimizer(self):
-        print('****Setting Up Optimizer')
+        pprint('****Setting Up Optimizer')
         self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate)
 
     def _classification_loss(self, alpha=0.25, gamma=2):
