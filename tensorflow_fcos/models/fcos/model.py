@@ -118,11 +118,6 @@ class FCOS:
                               name='classification_head')
 
     def _get_regression_head(self):
-        '''
-            From the FCOS paper, "since the regression targets are always
-            positive we employ exp(x) to map any real number to (0, ∞) on
-            the top of the regression branch"
-        '''
         kernel_init = RandomNormal(0.0, 0.01)
         input_layer = Input(shape=[None, None, 256])
         x = input_layer
