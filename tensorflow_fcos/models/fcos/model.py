@@ -230,10 +230,16 @@ class FCOS:
 
     def _centerness_loss(self, labels, logits):
         # TODO
-        #   a) mask negative locations
-        #   b) normalize loss value
+        #   a) Double check if tf.keras.Model.fit is handling
+        #      loss scaling for distributed training if not
+        #      use tf.nn.compute_average_loss fn
+        fg_mask = tf.cast(labels != 0, dtype=tf.float32)
         bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(
             labels=labels, logits=logits)
+        bce_loss = bce_loss * fg_mask
+        bce_loss = tf.reduce_sum(bce_loss, axis=1)
+        normalizer_value = tf.reduce_sum(fg_mask, axis=1)
+        bce_loss = bce_loss / normalizer_value
         return bce_loss
 
     def _regression_loss(self, labels, logits):
