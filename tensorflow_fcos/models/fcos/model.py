@@ -100,7 +100,7 @@ class FCOS:
 
         for i in range(4):
             x = conv_block(x, 256, 3, kernel_init=kernel_init,
-                           name_prefix='c_head_{}'.format(i))
+                           bn_act=False, name_prefix='c_head_{}'.format(i))
         classification_logits = conv_block(x, self.num_classes,
                                            3, kernel_init=kernel_init,
                                            bias_init=bias_init, bn_act=False,
@@ -129,7 +129,7 @@ class FCOS:
 
         for i in range(4):
             x = conv_block(x, 256, 3, kernel_init=kernel_init,
-                           name_prefix='r_head_{}'.format(i))
+                           bn_act=False, name_prefix='r_head_{}'.format(i))
         regression_logits = conv_block(x, 4, 3, kernel_init=kernel_init,
                                        bn_act=False, name_prefix='reg_logits')
         regression_logits = Reshape(target_shape=[-1, 4])(regression_logits)
@@ -204,9 +204,11 @@ class FCOS:
 
     def _classification_loss(self, alpha=0.25, gamma=2):
         # TODO
-        #   a) mask negative locations
-        #   b) normalize loss value
+        #   a) Double check if tf.keras.Model.fit is handling
+        #      loss scaling for distributed training if not
+        #      use tf.nn.compute_average_loss fn
         def focal_loss(y_true, y_pred):
+            fg_mask = tf.cast(y_true != 0, dtype=tf.float32)
             y_true = tf.one_hot(
                 tf.cast(y_true, dtype=tf.int32), depth=self.num_classes + 1)
             y_true = y_true[:, :, 1:]
@@ -218,6 +220,11 @@ class FCOS:
                 tf.pow(1 - pt, gamma) * \
                 tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=y_true, logits=y_pred)
+            f_loss = tf.reduce_mean(f_loss, axis=2)
+            f_loss = f_loss * fg_mask
+            f_loss = tf.reduce_sum(f_loss, axis=1, keepdims=True)
+            normalizer_value = tf.reduce_sum(fg_mask, axis=1, keepdims=True)
+            f_loss = f_loss / normalizer_value
             return f_loss
         return focal_loss
 
