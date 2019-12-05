@@ -9,6 +9,7 @@ from tensorflow.keras.layers import (Input,
                                      Add)
 from models.blocks import conv_block, upsample_like
 from models.custom_layers import Scale
+from data.encode import get_all_centers
 from pprint import pprint
 
 
@@ -242,27 +243,41 @@ class FCOS:
     @tf.function
     def _regression_loss(self, labels, logits):
         # TODO
-        #   a) IOU loss
-        #   b) mask negative locations
-        #   c) normalize loss value
-        #             boxes1 = tf.cast(boxes1, dtype=tf.float32)
-        #             boxes2 = tf.cast(boxes2, dtype=tf.float32)
+        #   a) Double check if tf.keras.Model.fit is handling
+        #      loss scaling for distributed training if not
+        #      use tf.nn.compute_average_loss fn
+        fg_mask = tf.cast(labels != 0, dtype=tf.float32)
+        boxes_true = tf.concat([
+            self._centers - labels[:, :, :2],
+            self._centers + labels[:, :, 2:]], axis=-1) * fg_mask
 
-        #             boxes1_t = change_box_format(boxes1, return_format='x1y1x2y2')
-        #             boxes2_t = change_box_format(boxes2, return_format='x1y1x2y2')
+        boxes_pred = tf.concat([
+            self._centers - logits[:, :, :2],
+            self._centers + logits[:, :, 2:]], axis=-1) * fg_mask
 
-        #             lu = tf.maximum(boxes1_t[:, :2], boxes2_t[:, :2])
-        #             rd = tf.minimum(boxes1_t[:, 2:], boxes2_t[:, 2:])
+        lu = tf.maximum(boxes_true[:, :, :2], boxes_pred[:, :, :2])
+        rd = tf.minimum(boxes_true[:, :, 2:], boxes_pred[:, :, 2:])
+        intersection = tf.maximum(0.0, rd - lu)
+        intersection_area = intersection[:, :, 0] * intersection[:, :, 1]
+        boxes_true_area = tf.reduce_prod(
+            boxes_true[:, :, 2:] - boxes_true[:, :, :2], axis=2)
+        boxes_pred_area = tf.reduce_prod(
+            boxes_pred[:, :, 2:] - boxes_pred[:, :, :2], axis=2)
+        union_area = tf.maximum(
+            boxes_true_area + boxes_pred_area - intersection_area, 1e-10)
+        iou = tf.clip_by_value(intersection_area / union_area, 0.0, 1.0)
 
-        #             intersection = tf.maximum(0.0, rd - lu)
-        #             inter_square = intersection[:, 0] * intersection[:, 1]
+        fg_mask = tf.reduce_sum(fg_mask, axis=2)
+        fg_mask = tf.cast(fg_mask != 0, dtype=tf.float32)
+        normalizer_value = tf.reduce_sum(fg_mask, axis=1, keepdims=True)
 
-        #             square1 = boxes1[:, 2] * boxes1[:, 3]
-        #             square2 = boxes2[:, 2] * boxes2[:, 3]
-
-        #             union_square = tf.maximum(
-        #                 square1 + square2 - inter_square, 1e-10)
-        #             return tf.clip_by_value(inter_square / union_square, 0.0, 1.0)
+        bg_mask = (1 - fg_mask) * 1e-7
+        iou_loss = iou + bg_mask
+        iou_loss = -1 * tf.math.log(iou_loss)
+        iou_loss = iou_loss * fg_mask
+        iou_loss = tf.reduce_sum(iou_loss, axis=1, keepdims=True)
+        iou_loss = iou_loss / normalizer_value
+        return iou_loss
 
     def train(self):
         loss_dict = {
@@ -271,6 +286,7 @@ class FCOS:
             'centerness_outputs': self._centerness_loss,
             'regression_outputs': self._regression_loss
         }
+        self._centers = get_all_centers(self.image_height, self.image_width)
         with self.distribute_strategy.scope():
             self.model.compile(optimizer=self.optimizer,
                                loss=loss_dict)
