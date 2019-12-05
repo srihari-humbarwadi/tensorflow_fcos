@@ -181,7 +181,7 @@ class FCOS:
                                 self.data_dir,
                                 self.batch_size)
 
-            self.train_steps = num_train_images // self.batch_size
+            self.training_steps = num_train_images // self.batch_size
             self.val_steps = num_val_images // self.batch_size
 
     def _build_callbacks(self):
@@ -205,6 +205,7 @@ class FCOS:
         #      use tf.nn.compute_average_loss fn
         @tf.function
         def focal_loss(y_true, y_pred):
+            y_true = y_true[:, :, 0]
             fg_mask = tf.cast(y_true != 0, dtype=tf.float32)
             y_true = tf.one_hot(
                 tf.cast(y_true, dtype=tf.int32), depth=self.num_classes + 1)
@@ -217,7 +218,7 @@ class FCOS:
                 tf.pow(1 - pt, gamma) * \
                 tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=y_true, logits=y_pred)
-            f_loss = tf.reduce_mean(f_loss, axis=2)
+            f_loss = tf.reduce_sum(f_loss, axis=2)
             f_loss = f_loss * fg_mask
             f_loss = tf.reduce_sum(f_loss, axis=1, keepdims=True)
             normalizer_value = tf.reduce_sum(fg_mask, axis=1, keepdims=True)
@@ -280,7 +281,6 @@ class FCOS:
         return iou_loss
 
     def train(self):
-        pprint('****Starting Training Loop')
         loss_dict = {
             'classification_outputs': self._classification_loss(alpha=0.25,
                                                                 gamma=2),
@@ -288,6 +288,8 @@ class FCOS:
             'regression_outputs': self._regression_loss
         }
         self._centers = get_all_centers(self.image_height, self.image_width)
+        self._centers = tf.concat(self._centers, axis=0)
+        print('****Starting Training Loop')
         with self.distribute_strategy.scope():
             self.model.compile(optimizer=self.optimizer,
                                loss=loss_dict)
