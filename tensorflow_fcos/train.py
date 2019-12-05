@@ -5,7 +5,8 @@ import tensorflow as tf
 
 print('TensorFlow:', tf.__version__)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-strategy = tf.distribute.OneDeviceStrategy(device='/cpu:0')
+tf.config.optimizer.set_jit(True)
+strategy = tf.distribute.MirroredStrategy()
 
 
 config = {
@@ -16,7 +17,7 @@ config = {
     'num_classes': 10,
     'dataset_fn': dataset_fn,
     'data_dir': './tfrecords',
-    'batch_size': 4,
+    'batch_size': 8,
     'epochs': 250,
     'learning_rate': 1e-4,
     'model_dir': './model_files',
