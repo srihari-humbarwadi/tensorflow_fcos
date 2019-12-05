@@ -202,6 +202,7 @@ class FCOS:
         #   a) Double check if tf.keras.Model.fit is handling
         #      loss scaling for distributed training if not
         #      use tf.nn.compute_average_loss fn
+        @tf.function
         def focal_loss(y_true, y_pred):
             fg_mask = tf.cast(y_true != 0, dtype=tf.float32)
             y_true = tf.one_hot(
@@ -223,6 +224,7 @@ class FCOS:
             return f_loss
         return focal_loss
 
+    @tf.function
     def _centerness_loss(self, labels, logits):
         # TODO
         #   a) Double check if tf.keras.Model.fit is handling
@@ -237,12 +239,30 @@ class FCOS:
         bce_loss = bce_loss / normalizer_value
         return bce_loss
 
+    @tf.function
     def _regression_loss(self, labels, logits):
         # TODO
         #   a) IOU loss
         #   b) mask negative locations
         #   c) normalize loss value
-        pass
+        #             boxes1 = tf.cast(boxes1, dtype=tf.float32)
+        #             boxes2 = tf.cast(boxes2, dtype=tf.float32)
+
+        #             boxes1_t = change_box_format(boxes1, return_format='x1y1x2y2')
+        #             boxes2_t = change_box_format(boxes2, return_format='x1y1x2y2')
+
+        #             lu = tf.maximum(boxes1_t[:, :2], boxes2_t[:, :2])
+        #             rd = tf.minimum(boxes1_t[:, 2:], boxes2_t[:, 2:])
+
+        #             intersection = tf.maximum(0.0, rd - lu)
+        #             inter_square = intersection[:, 0] * intersection[:, 1]
+
+        #             square1 = boxes1[:, 2] * boxes1[:, 3]
+        #             square2 = boxes2[:, 2] * boxes2[:, 3]
+
+        #             union_square = tf.maximum(
+        #                 square1 + square2 - inter_square, 1e-10)
+        #             return tf.clip_by_value(inter_square / union_square, 0.0, 1.0)
 
     def train(self):
         loss_dict = {

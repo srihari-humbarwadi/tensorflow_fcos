@@ -2,11 +2,12 @@ from data.bdd_dataset.dataset import dataset_fn
 from models.fcos import FCOS
 import os
 import tensorflow as tf
+from tqdm import tqdm
 
 
 print('TensorFlow:', tf.__version__)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-strategy = tf.distribute.OneDeviceStrategy(device='/cpu:0')
+strategy = tf.distribute.OneDeviceStrategy(device='/gpu:0')
 
 
 if __name__ == '__main__':
@@ -32,7 +33,8 @@ if __name__ == '__main__':
         print(spec)
 
     test_input = [batch for batch in fcos_model.train_dataset.take(1)][0]
-    test_output = fcos_model.model(test_input, training=False)
+    for i in tqdm(range(200)):
+        test_output = fcos_model.model(test_input, training=False)
 
     print('****Dummy Output')
     for tensor in test_output:
