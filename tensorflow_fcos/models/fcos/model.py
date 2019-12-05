@@ -280,6 +280,7 @@ class FCOS:
         return iou_loss
 
     def train(self):
+        pprint('****Starting Training Loop')
         loss_dict = {
             'classification_outputs': self._classification_loss(alpha=0.25,
                                                                 gamma=2),
