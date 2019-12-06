@@ -198,7 +198,8 @@ class FCOS:
 
     def _build_optimizer(self):
         pprint('****Setting Up Optimizer')
-        self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate)
+        self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate,
+                                                  clipnorm=0.0001)
 
     def _classification_loss(self, alpha=0.25, gamma=2):
         # TODO
