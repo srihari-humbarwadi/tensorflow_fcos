@@ -3,11 +3,12 @@ from models.fcos import FCOS
 import os
 import tensorflow as tf
 
+
 print('TensorFlow:', tf.__version__)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.config.optimizer.set_jit(True)
 strategy = tf.distribute.MirroredStrategy()
-
+data_dir = os.environ['HOME'] + '/datasets/BDD100k'
 
 config = {
     'mode': 'train',
@@ -16,7 +17,7 @@ config = {
     'image_width': 1280,
     'num_classes': 10,
     'dataset_fn': dataset_fn,
-    'data_dir': '~/datasets/BDD100k',
+    'data_dir': data_dir,
     'batch_size': 8,
     'epochs': 50,
     'learning_rate': 1e-4,
