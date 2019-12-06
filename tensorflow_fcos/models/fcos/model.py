@@ -187,7 +187,9 @@ class FCOS:
     def _build_callbacks(self):
         pprint('****Setting Up Callbacks')
         self.callbacks = [
-            TensorBoard(log_dir=self.tensorboard_log_dir),
+            TensorBoard(log_dir=self.tensorboard_log_dir,
+                        histogram_freq=1,
+                        profile_batch=3),
             ModelCheckpoint(filepath=self.model_dir + '/ckpt-{epoch:02d}',
                             monitor='val_loss',
                             save_weights_only=True,
@@ -219,7 +221,7 @@ class FCOS:
                 tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=y_true, logits=y_pred)
             f_loss = tf.reduce_sum(f_loss, axis=2)
-            f_loss = f_loss * fg_mask
+            # f_loss = f_loss * fg_mask
             f_loss = tf.reduce_sum(f_loss, axis=1, keepdims=True)
             normalizer_value = tf.reduce_sum(fg_mask, axis=1, keepdims=True)
             f_loss = f_loss / normalizer_value
@@ -289,7 +291,7 @@ class FCOS:
         }
         self._centers = get_all_centers(self.image_height, self.image_width)
         self._centers = tf.concat(self._centers, axis=0)
-        print('****Starting Training Loop')
+        pprint('****Starting Training Loop')
         with self.distribute_strategy.scope():
             self.model.compile(optimizer=self.optimizer,
                                loss=loss_dict)
