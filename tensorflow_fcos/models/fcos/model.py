@@ -236,7 +236,7 @@ class FCOS:
         fg_mask = tf.cast(labels != 0, dtype=tf.float32)
         bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(
             labels=labels, logits=logits)
-        bce_loss = bce_loss * fg_mask
+        bce_loss = bce_loss[:, :, 0] * fg_mask[:, :, 0]
         bce_loss = tf.reduce_sum(bce_loss, axis=1)
         normalizer_value = tf.reduce_sum(fg_mask, axis=1)
         bce_loss = bce_loss / normalizer_value
@@ -297,5 +297,5 @@ class FCOS:
                            epochs=self.epochs,
                            steps_per_epoch=self.training_steps,
                            validation_data=self.val_dataset,
-                           validation_steps=self.val_steps,
-                           callbacks=self.callbacks)
+                           validation_steps=self.val_steps)
+            # callbacks=self.callbacks)

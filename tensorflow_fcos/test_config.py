@@ -32,9 +32,12 @@ if __name__ == '__main__':
     for spec in tf.data.experimental.get_structure(fcos_model.train_dataset):
         print(spec)
 
-    test_input = [batch for batch in fcos_model.train_dataset.take(1)][0]
-    for i in tqdm(range(50)):
-        test_output = fcos_model.model(test_input, training=False)
+    for batch in tqdm(fcos_model.train_dataset.take(1000)):
+        test_output = fcos_model.model(batch)
+
+    # test_input = [batch for batch in fcos_model.train_dataset.take(1)][0]
+    # for i in tqdm(range(50)):
+    #     test_output = fcos_model.model(test_input, training=False)
 
     print('****Dummy Output')
     for tensor in test_output:

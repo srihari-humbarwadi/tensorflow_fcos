@@ -171,11 +171,13 @@ def compute_targets(H, W, labels):
     classification_target = tf.tile(classification_target,
                                     multiples=[1, 10])
     centerness_target = tf.concat(centerness_target, axis=0)
+    centerness_target = tf.expand_dims(centerness_target, axis=-1)
     regression_target = tf.concat(regression_target, axis=0)
     return classification_target, centerness_target, regression_target
 
 
 def load_data(h, w):
+    @tf.function
     def load_data_(example_proto):
         image, boxes_, class_ids = parse_example(example_proto)
         image.set_shape([None, None, 3])
