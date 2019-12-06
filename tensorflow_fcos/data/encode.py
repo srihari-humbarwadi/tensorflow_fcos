@@ -176,7 +176,6 @@ def compute_targets(H, W, labels):
 
 
 def load_data(h, w):
-    @tf.function
     def load_data_(example_proto):
         image, boxes_, class_ids = parse_example(example_proto)
         image.set_shape([None, None, 3])
