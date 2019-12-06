@@ -189,7 +189,8 @@ class FCOS:
         self.callbacks = [
             TensorBoard(log_dir=self.tensorboard_log_dir,
                         histogram_freq=1,
-                        profile_batch=3),
+                        profile_batch=3,
+                        update_freq='batch'),
             ModelCheckpoint(filepath=self.model_dir + '/ckpt-{epoch:02d}',
                             monitor='val_loss',
                             save_weights_only=True,
@@ -301,5 +302,4 @@ class FCOS:
                            steps_per_epoch=self.training_steps,
                            validation_data=self.val_dataset,
                            validation_steps=self.val_steps,
-                           validation_freq=2,
                            callbacks=self.callbacks)
