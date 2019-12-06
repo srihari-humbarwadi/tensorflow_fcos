@@ -189,7 +189,7 @@ class FCOS:
         self.callbacks = [
             TensorBoard(log_dir=self.tensorboard_log_dir,
                         histogram_freq=1,
-                        profile_batch=3,
+                        profile_batch=0,
                         update_freq='batch'),
             ModelCheckpoint(filepath=self.model_dir + '/ckpt-{epoch:02d}',
                             monitor='val_loss',
@@ -202,33 +202,30 @@ class FCOS:
         self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate,
                                                   clipnorm=0.0001)
 
-    def _classification_loss(self, alpha=0.25, gamma=2):
+    @tf.function
+    def _classification_loss(self, y_true, y_pred, alpha=0.25, gamma=2):
         # TODO
         #   a) Double check if tf.keras.Model.fit is handling
         #      loss scaling for distributed training if not
         #      use tf.nn.compute_average_loss fn
-        @tf.function
-        def focal_loss(y_true, y_pred):
-            y_true = y_true[:, :, 0]
-            fg_mask = tf.cast(y_true != 0, dtype=tf.float32)
-            y_true = tf.one_hot(
-                tf.cast(y_true, dtype=tf.int32), depth=self.num_classes + 1)
-            y_true = y_true[:, :, 1:]
-            y_pred_ = tf.sigmoid(y_pred)
+        y_true = y_true[:, :, 0]
+        fg_mask = tf.cast(y_true != 0, dtype=tf.float32)
+        y_true = tf.one_hot(
+            tf.cast(y_true, dtype=tf.int32), depth=self.num_classes + 1)
+        y_true = y_true[:, :, 1:]
+        y_pred_ = tf.sigmoid(y_pred)
 
-            at = alpha * y_true + (1 - y_true) * (1 - alpha)
-            pt = y_true * y_pred_ + (1 - y_true) * (1 - y_pred_)
-            f_loss = at * \
-                tf.pow(1 - pt, gamma) * \
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=y_true, logits=y_pred)
-            f_loss = tf.reduce_sum(f_loss, axis=2)
-            # f_loss = f_loss * fg_mask
-            f_loss = tf.reduce_sum(f_loss, axis=1, keepdims=True)
-            normalizer_value = tf.reduce_sum(fg_mask, axis=1, keepdims=True)
-            f_loss = f_loss / normalizer_value
-            return f_loss
-        return focal_loss
+        at = alpha * y_true + (1 - y_true) * (1 - alpha)
+        pt = y_true * y_pred_ + (1 - y_true) * (1 - y_pred_)
+        f_loss = at * \
+            tf.pow(1 - pt, gamma) * \
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=y_true, logits=y_pred)
+        f_loss = tf.reduce_sum(f_loss, axis=2)
+        f_loss = tf.reduce_sum(f_loss, axis=1, keepdims=True)
+        normalizer_value = tf.reduce_sum(fg_mask, axis=1, keepdims=True)
+        f_loss = f_loss / normalizer_value
+        return f_loss
 
     @tf.function
     def _centerness_loss(self, labels, logits):
@@ -286,8 +283,7 @@ class FCOS:
 
     def train(self):
         loss_dict = {
-            'classification_outputs': self._classification_loss(alpha=0.25,
-                                                                gamma=2),
+            'classification_outputs': self._classification_loss,
             'centerness_outputs': self._centerness_loss,
             'regression_outputs': self._regression_loss
         }
