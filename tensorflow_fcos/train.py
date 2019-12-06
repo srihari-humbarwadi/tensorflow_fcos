@@ -16,9 +16,9 @@ config = {
     'image_width': 1280,
     'num_classes': 10,
     'dataset_fn': dataset_fn,
-    'data_dir': './tfrecords',
+    'data_dir': '~/datasets/BDD100k',
     'batch_size': 8,
-    'epochs': 250,
+    'epochs': 50,
     'learning_rate': 1e-4,
     'model_dir': './model_files',
     'tensorboard_log_dir': './logs'
