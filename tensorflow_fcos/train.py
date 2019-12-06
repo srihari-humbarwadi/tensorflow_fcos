@@ -6,6 +6,8 @@ import tensorflow as tf
 
 print('TensorFlow:', tf.__version__)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_cpu_global_jit'
+
 tf.config.optimizer.set_jit(True)
 strategy = tf.distribute.MirroredStrategy()
 data_dir = os.environ['HOME'] + '/datasets/BDD100k'
