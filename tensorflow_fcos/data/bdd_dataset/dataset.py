@@ -4,8 +4,6 @@ from data.encode import load_data
 
 def create_dataset(H, W, tf_records_pattern, batch_size):
     autotune = tf.data.experimental.AUTOTUNE
-    options = tf.data.Options()
-    options.experimental_deterministic = False
     train_files = tf.data.Dataset.list_files(tf_records_pattern)
     dataset = train_files.interleave(tf.data.TFRecordDataset,
                                      cycle_length=16,
@@ -16,7 +14,6 @@ def create_dataset(H, W, tf_records_pattern, batch_size):
     dataset = dataset.shuffle(512)
     dataset = dataset.batch(batch_size, drop_remainder=True).repeat()
     dataset = dataset.prefetch(autotune)
-    dataset = dataset.with_options(options)
     return dataset
 
 
