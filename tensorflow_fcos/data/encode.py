@@ -168,6 +168,9 @@ def compute_targets(H, W, labels):
         regression_target.append(reg_target)
 
     classification_target = tf.concat(classification_target, axis=0)
+    classification_target = tf.expand_dims(classification_target, axis=-1)
+    classification_target = tf.tile(classification_target,
+                                    multiples=[1, 10])
     centerness_target = tf.concat(centerness_target, axis=0)
     regression_target = tf.concat(regression_target, axis=0)
     return classification_target, centerness_target, regression_target
