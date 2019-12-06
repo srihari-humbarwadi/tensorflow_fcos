@@ -141,7 +141,6 @@ def compute_targets_(centers, labels, low, high):
     centerness_target = tf.sqrt(
         (min_lr / max_lr) * (min_tb / max_tb)) * fg_mask[:, 0]
     regression_target = tf.stack([l, t, r, b], axis=1) * fg_mask
-
     return classification_target, centerness_target, regression_target
 
 
