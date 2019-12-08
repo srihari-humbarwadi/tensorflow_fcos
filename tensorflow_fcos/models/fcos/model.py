@@ -282,6 +282,10 @@ class FCOS:
         return iou_loss
 
     def train(self):
+        # TODO
+        #   a) Get background mask from dataset loader
+        #   b) Run custom training loop
+        #   c) Calculate loss separately for each feature level
         loss_dict = {
             'classification_outputs': self._classification_loss,
             'centerness_outputs': self._centerness_loss,
