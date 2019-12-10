@@ -35,7 +35,7 @@ class FCOS:
             'epochs',
             'learning_rate',
             'model_dir',
-            'tensorboard_log_dir'
+            'tensorboard_log_dir',
             'restore_parameters'
         ]
         for attr in attr_list:
@@ -138,11 +138,10 @@ class FCOS:
             self._classification_head = self._get_classification_head()
             self._regression_head = self._get_regression_head()
 
-            self._classification_logits = []
-            self._centerness_logits = []
-            self._regression_logits = []
+            _classification_logits = []
+            _centerness_logits = []
+            _regression_logits = []
 
-            outputs = []
             for i in range(3, 8):
                 feature = self._pyramid_features['P{}'.format(i)]
                 _cls_head_logits = self._classification_head(feature)
@@ -150,11 +149,16 @@ class FCOS:
                 _reg_head_logits = \
                     Scale(init_value=1.0,
                           name='P{}_reg_outputs'.format(i))(_reg_head_logits)
-                outputs.append([_cls_head_logits[0][0],
-                                _cls_head_logits[0][1],
-                                _reg_head_logits])
+
+                _classification_logits.append(_cls_head_logits[0][0])
+                _centerness_logits.append(_cls_head_logits[0][1])
+                _regression_logits.append(_reg_head_logits)
 
             _image_input = self._backbone.input
+            outputs = [*_classification_logits,
+                       *_centerness_logits,
+                       *_regression_logits
+                       ]
             self.model = tf.keras.Model(
                 inputs=[_image_input], outputs=outputs, name='FCOS')
 
