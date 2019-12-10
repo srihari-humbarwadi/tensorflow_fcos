@@ -8,6 +8,7 @@ from tensorflow.keras.layers import (Input,
                                      Add)
 from models.blocks import conv_block, upsample_like
 from models.custom_layers import Scale
+from models.fcos.losses import focal_loss, centerness_loss, iou_loss
 from pprint import pprint
 
 
@@ -20,7 +21,6 @@ class FCOS:
         self._build_model()
         self._build_datasets()
         self._build_optimizer()
-        self._build_callbacks()
 
     def _validate_config(self, config):
         attr_list = [
@@ -171,6 +171,12 @@ class FCOS:
                                 self.image_width,
                                 self.data_dir,
                                 self.batch_size)
+            self.train_dataset = \
+                self.distribute_strategy.experimental_distribute_dataset(
+                    self.train_dataset)
+            self.val_dataset = \
+                self.distribute_strategy.experimental_distribute_dataset(
+                    self.val_dataset)
 
             self.training_steps = num_train_images // self.batch_size
             self.val_steps = num_val_images // self.batch_size
@@ -225,9 +231,10 @@ class FCOS:
             metrics_dict.update({metric.name: np.round(metric.result(), 3)})
         pprint(metrics_dict)
 
-    def _compute_loss(self, targets, cls_outputs,
-                      ctr_outputs, reg_outputs):
-        pass
+    def _compute_loss(self, targets, outputs):
+        cls_outputs = outputs[:5]
+        ctr_outputs = outputs[5:10]
+        reg_outputs = outputs[10:]
 
     def train(self):
         # TODO
@@ -240,11 +247,9 @@ class FCOS:
         @tf.function
         def _train_step(images, targets):
             with tf.GradientTape() as tape:
-                cls_outputs, ctr_outputs, reg_outputs = self.model(
-                    images, training=True)
+                outputs = self.model(images, training=True)
                 cls_loss, ctr_loss, reg_losss = \
-                    self._compute_loss(targets, cls_outputs,
-                                       ctr_outputs, reg_outputs)
+                    self._compute_loss(targets, outputs)
                 loss = cls_loss + ctr_loss + reg_losss
             gradients =  \
                 tape.gradient(loss, self.model.trainable_variables)
@@ -264,16 +269,17 @@ class FCOS:
 
         @tf.function
         def _train():
-            self.epoch = 0
-            for _ in range(self.epochs):
-                self.iterations = 0
-                for images, targets in self.dataset:
-                    metrics = _distributed_train_step(images, targets)
-                    self.update_metrics(metrics)
-                    self.log_metrics()
-                    self.iterations += 1
-                self.write_summaries(metrics)
-                self.reset_metrics()
-                self.write_checkpoint()
-                self.epoch += 1
+            with self.distribute_strategy.scope():
+                self.epoch = 0
+                for _ in range(self.epochs):
+                    self.iterations = 0
+                    for images, targets in self.dataset:
+                        metrics = _distributed_train_step(images, targets)
+                        self.update_metrics(metrics)
+                        self.log_metrics()
+                        self.iterations += 1
+                    self.write_summaries(metrics)
+                    self.reset_metrics()
+                    self.write_checkpoint()
+                    self.epoch += 1
         return _train()

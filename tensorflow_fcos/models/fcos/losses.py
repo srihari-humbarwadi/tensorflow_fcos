@@ -28,7 +28,7 @@ def focal_loss(y_true,
 
 
 @tf.function
-def _centerness_loss(labels, logits, fg_mask):
+def centerness_loss(labels, logits, fg_mask):
     bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=labels, logits=logits)
     bce_loss = bce_loss[:, :, 0] * fg_mask[:, :, 0]
@@ -39,7 +39,7 @@ def _centerness_loss(labels, logits, fg_mask):
 
 
 @tf.function
-def _regression_loss(labels, logits, centers, fg_mask):
+def iou_loss(labels, logits, centers, fg_mask):
     boxes_true = tf.concat([
         centers - labels[:, :, :2],
         centers + labels[:, :, 2:]], axis=-1)
