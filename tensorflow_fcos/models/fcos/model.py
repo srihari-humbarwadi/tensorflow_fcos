@@ -1,7 +1,7 @@
 import numpy as np
+import os
 import tensorflow as tf
 from tensorflow.keras.initializers import RandomNormal, Constant
-from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.layers import (Input,
                                      Concatenate,
                                      Reshape,
@@ -9,7 +9,6 @@ from tensorflow.keras.layers import (Input,
                                      Add)
 from models.blocks import conv_block, upsample_like
 from models.custom_layers import Scale
-from data.encode import get_all_centers
 from pprint import pprint
 
 
@@ -38,6 +37,7 @@ class FCOS:
             'learning_rate',
             'model_dir',
             'tensorboard_log_dir'
+            'restore_parameters'
         ]
         for attr in attr_list:
             assert attr in config, 'Missing {} in config'.format(attr)
@@ -184,43 +184,104 @@ class FCOS:
             self.training_steps = num_train_images // self.batch_size
             self.val_steps = num_val_images // self.batch_size
 
-    def _build_callbacks(self):
-        pprint('****Setting Up Callbacks')
-        self.callbacks = [
-            TensorBoard(log_dir=self.tensorboard_log_dir,
-                        histogram_freq=1,
-                        profile_batch=0,
-                        update_freq='batch'),
-            ModelCheckpoint(filepath=self.model_dir + '/ckpt-{epoch:02d}',
-                            monitor='val_loss',
-                            save_weights_only=True,
-                            save_best_only=True)
-        ]
-
     def _build_optimizer(self):
         pprint('****Setting Up Optimizer')
         self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate,
                                                   clipnorm=0.0001)
 
+    def initialize_metrics(self):
+        with self.distribute_strategy.scope():
+            pass
+
+    def restore_checkpoint(self, checkpoint_path):
+        self.checkpoint.restore(checkpoint_path)
+
+    def create_checkpoint_manager(self):
+        with self.distribute_strategy.scope():
+            self.checkpoint = tf.train.Checkpoint(model=self.model,
+                                                  optimizer=self.optimizer)
+            if self.restore_parameters:
+                print('****Restoring Parameters')
+                print('++++Restored Parameters from ' + self.latest_checkpoint)
+                self.restore_status = self.checkpoint.restore(
+                    self.latest_checkpoint)
+
+    def create_summary_writer(self):
+        self.summary_writer = tf.summary.create_file_writer(
+            logdir=self.tensorboard_log_dir)
+
+    def write_summaries(self, metrics):
+        print('****Writing Summaries')
+
+    def write_checkpoint(self):
+        with self.distribute_strategy.scope():
+            self.checkpoint.save(os.path.join(self.model_dir,
+                                              self.checkpoint_prefix))
+
+    def update_metrics(self, metrics):
+        pass
+
+    def reset_metrics(self):
+        for metric in self.metrics:
+            metric.reset_states()
+
+    def log_metrics(self):
+        metrics_dict = {
+            'epoch': self.epoch,
+            'batch': self.iterations,
+        }
+        for metric in self.metrics:
+            metrics_dict.update({metric.name: np.round(metric.result(), 3)})
+        print(metrics_dict)
+
+    def compute_loss(self, targets, cls_outputs,
+                     ctr_outputs, reg_outputs):
+        pass
+
     def train(self):
         # TODO
-        #   a) Get background mask from dataset loader
+        #   a) compute centers
         #   b) Run custom training loop
         #   c) Calculate loss separately for each feature level
-        loss_dict = {
-            'classification_outputs': self._classification_loss,
-            'centerness_outputs': self._centerness_loss,
-            'regression_outputs': self._regression_loss
-        }
-        self._centers = get_all_centers(self.image_height, self.image_width)
-        self._centers = tf.concat(self._centers, axis=0)
-        pprint('****Starting Training Loop')
-        with self.distribute_strategy.scope():
-            self.model.compile(optimizer=self.optimizer,
-                               loss=loss_dict)
-            self.model.fit(self.train_dataset,
-                           epochs=self.epochs,
-                           steps_per_epoch=self.training_steps,
-                           validation_data=self.val_dataset,
-                           validation_steps=self.val_steps)
-            # callbacks=self.callbacks)
+        assert self.mode == 'train', 'Cannot train in inference mode'
+        print('****Starting Training Loop')
+
+        @tf.function
+        def train_step(images, targets):
+            with tf.GradientTape() as tape:
+                cls_outputs, ctr_outputs, reg_outputs = self.model(
+                    images, training=True)
+                cls_loss, ctr_loss, reg_losss = \
+                    self.compute_loss(targets, cls_outputs,
+                                      ctr_outputs, reg_outputs)
+                loss = cls_loss + ctr_loss + reg_losss
+            gradients =  \
+                tape.gradient(loss, self.model.trainable_variables)
+            self.optimizer.apply_gradients(zip(gradients,
+                                               self.model.trainable_variables))
+
+        @tf.function
+        def distributed_train_step(images, targets):
+            per_replica_metrics = \
+                self.distribute_strategy.experimental_run_v2(fn=train_step,
+                                                             args=(images,
+                                                                   targets))
+            reduced_metrics = \
+                self.distribute_strategy.reduce(tf.distribute.ReduceOp.SUM,
+                                                per_replica_metrics, axis=0)
+            return reduced_metrics
+
+        @tf.function
+        def _train():
+            self.epoch = 0
+            for _ in range(self.epochs):
+                self.iterations = 0
+                for images, targets in self.dataset:
+                    metrics = distributed_train_step(images, targets)
+                    self.update_metrics(metrics)
+                    self.log_metrics()
+                    self.iterations += 1
+                self.write_summaries(metrics)
+                self.reset_metrics()
+                self.write_checkpoint()
+                self.epoch += 1
