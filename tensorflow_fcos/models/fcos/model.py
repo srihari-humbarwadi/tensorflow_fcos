@@ -3,7 +3,6 @@ import os
 import tensorflow as tf
 from tensorflow.keras.initializers import RandomNormal, Constant
 from tensorflow.keras.layers import (Input,
-                                     Concatenate,
                                      Reshape,
                                      ReLU,
                                      Add)
@@ -143,6 +142,7 @@ class FCOS:
             self._centerness_logits = []
             self._regression_logits = []
 
+            outputs = []
             for i in range(3, 8):
                 feature = self._pyramid_features['P{}'.format(i)]
                 _cls_head_logits = self._classification_head(feature)
@@ -150,26 +150,13 @@ class FCOS:
                 _reg_head_logits = \
                     Scale(init_value=1.0,
                           name='P{}_reg_outputs'.format(i))(_reg_head_logits)
-
-                self._classification_logits.append(_cls_head_logits[0][0])
-                self._centerness_logits.append(_cls_head_logits[0][1])
-                self._regression_logits.append(_reg_head_logits)
-
-            self._classification_logits = Concatenate(
-                axis=1,
-                name='classification_outputs')(self._classification_logits)
-            self._centerness_logits = Concatenate(
-                axis=1, name='centerness_outputs')(self._centerness_logits)
-            self._regression_logits = Concatenate(
-                axis=1, name='regression_outputs')(self._regression_logits)
+                outputs.append([_cls_head_logits[0][0],
+                                _cls_head_logits[0][1],
+                                _reg_head_logits])
 
             _image_input = self._backbone.input
-            outputs = [self._classification_logits,
-                       self._centerness_logits,
-                       self._regression_logits]
             self.model = tf.keras.Model(
                 inputs=[_image_input], outputs=outputs, name='FCOS')
-            self.model.build([self.image_height, self.image_width, 3])
 
     def _build_datasets(self):
         pprint('****Building Datasets')
@@ -189,53 +176,53 @@ class FCOS:
         self.optimizer = tf.keras.optimizers.Adam(lr=self.learning_rate,
                                                   clipnorm=0.0001)
 
-    def initialize_metrics(self):
+    def _initialize_metrics(self):
         with self.distribute_strategy.scope():
             pass
 
     def restore_checkpoint(self, checkpoint_path):
         self.checkpoint.restore(checkpoint_path)
 
-    def create_checkpoint_manager(self):
+    def _create_checkpoint_manager(self):
         with self.distribute_strategy.scope():
             self.checkpoint = tf.train.Checkpoint(model=self.model,
                                                   optimizer=self.optimizer)
             if self.restore_parameters:
-                print('****Restoring Parameters')
-                print('++++Restored Parameters from ' + self.latest_checkpoint)
+                pprint('****Restoring Parameters')
+                pprint('****Restored Parameters')
                 self.restore_status = self.checkpoint.restore(
                     self.latest_checkpoint)
 
-    def create_summary_writer(self):
+    def _create_summary_writer(self):
         self.summary_writer = tf.summary.create_file_writer(
             logdir=self.tensorboard_log_dir)
 
-    def write_summaries(self, metrics):
-        print('****Writing Summaries')
+    def _write_summaries(self, metrics):
+        pprint('****Writing Summaries')
 
     def write_checkpoint(self):
         with self.distribute_strategy.scope():
             self.checkpoint.save(os.path.join(self.model_dir,
                                               self.checkpoint_prefix))
 
-    def update_metrics(self, metrics):
+    def _update_metrics(self, metrics):
         pass
 
-    def reset_metrics(self):
+    def _reset_metrics(self):
         for metric in self.metrics:
             metric.reset_states()
 
-    def log_metrics(self):
+    def _log_metrics(self):
         metrics_dict = {
             'epoch': self.epoch,
             'batch': self.iterations,
         }
         for metric in self.metrics:
             metrics_dict.update({metric.name: np.round(metric.result(), 3)})
-        print(metrics_dict)
+        pprint(metrics_dict)
 
-    def compute_loss(self, targets, cls_outputs,
-                     ctr_outputs, reg_outputs):
+    def _compute_loss(self, targets, cls_outputs,
+                      ctr_outputs, reg_outputs):
         pass
 
     def train(self):
@@ -244,16 +231,16 @@ class FCOS:
         #   b) Run custom training loop
         #   c) Calculate loss separately for each feature level
         assert self.mode == 'train', 'Cannot train in inference mode'
-        print('****Starting Training Loop')
+        pprint('****Starting Training Loop')
 
         @tf.function
-        def train_step(images, targets):
+        def _train_step(images, targets):
             with tf.GradientTape() as tape:
                 cls_outputs, ctr_outputs, reg_outputs = self.model(
                     images, training=True)
                 cls_loss, ctr_loss, reg_losss = \
-                    self.compute_loss(targets, cls_outputs,
-                                      ctr_outputs, reg_outputs)
+                    self._compute_loss(targets, cls_outputs,
+                                       ctr_outputs, reg_outputs)
                 loss = cls_loss + ctr_loss + reg_losss
             gradients =  \
                 tape.gradient(loss, self.model.trainable_variables)
@@ -261,9 +248,9 @@ class FCOS:
                                                self.model.trainable_variables))
 
         @tf.function
-        def distributed_train_step(images, targets):
+        def _distributed_train_step(images, targets):
             per_replica_metrics = \
-                self.distribute_strategy.experimental_run_v2(fn=train_step,
+                self.distribute_strategy.experimental_run_v2(fn=_train_step,
                                                              args=(images,
                                                                    targets))
             reduced_metrics = \
@@ -277,7 +264,7 @@ class FCOS:
             for _ in range(self.epochs):
                 self.iterations = 0
                 for images, targets in self.dataset:
-                    metrics = distributed_train_step(images, targets)
+                    metrics = _distributed_train_step(images, targets)
                     self.update_metrics(metrics)
                     self.log_metrics()
                     self.iterations += 1
