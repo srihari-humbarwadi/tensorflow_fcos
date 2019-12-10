@@ -285,3 +285,4 @@ class FCOS:
                 self.reset_metrics()
                 self.write_checkpoint()
                 self.epoch += 1
+        return _train()
