@@ -1,7 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.initializers import Constant
 from tensorflow.keras import backend as K
-from data.encode import get_all_centers
 
 
 class Scale(tf.keras.layers.Layer):
@@ -36,3 +35,4 @@ class Scale(tf.keras.layers.Layer):
 
 class Decode(tf.keras.layers.Layer):
     # ToDo: Process outputs from all feature maps
+    pass
