@@ -1,6 +1,8 @@
 import tensorflow as tf
 from data.tf_record_parser import parse_example
 
+all_centers = [None] * 8
+
 
 def flip_data(image, boxes, w):
     if tf.random.uniform(()) > 0.5:
@@ -36,8 +38,14 @@ def get_centers(level, h, w):
     return cxy
 
 
+def generate_centers(h, w):
+    global all_centers
+    for level in range(3, 8):
+        all_centers[level] = get_centers(level, h, w)
+
+
 def compute_target_(level, boxes, class_ids, low, high, h, w):
-    centers = get_centers(level, h, w)
+    centers = all_centers[level]
 
     xy_min_ = boxes[:, :2]
     xy_max_ = boxes[:, 2:]
@@ -79,18 +87,20 @@ def compute_target_(level, boxes, class_ids, low, high, h, w):
     classification_target = matched_class_ids * fg_mask
     centerness_target = tf.sqrt(
         (min_lr / max_lr) * (min_tb / max_tb)) * fg_mask
+    centerness_target = tf.reshape(centerness_target, shape=[-1, 1])
     regression_target = tf.stack(
         [_l, t, r, b], axis=1) * tf.expand_dims(fg_mask, axis=1)
-
-    normalizer_value = tf.maximum(tf.reduce_sum(fg_mask), 1.)
 
     return (classification_target,
             centerness_target,
             regression_target,
-            fg_mask,
-            normalizer_value)
+            fg_mask)
 
 
+@tf.function(input_signature=[
+    tf.TensorSpec(shape=[None, 5], dtype=tf.float32),
+    tf.TensorSpec(shape=[], dtype=tf.float32),
+    tf.TensorSpec(shape=[], dtype=tf.float32)])
 def compute_targets(labels, h, w):
     boxes_ = labels[:, :4]
     class_ids_ = labels[:, 4]
@@ -105,16 +115,43 @@ def compute_targets(labels, h, w):
     P5_target = compute_target_(5, boxes, class_ids, 128, 256, h, w)
     P6_target = compute_target_(6, boxes, class_ids, 256, 512, h, w)
     P7_target = compute_target_(7, boxes, class_ids, 512, 1e8, h, w)
-    return {
-        'P3': P3_target,
-        'P4': P4_target,
-        'P5': P5_target,
-        'P6': P6_target,
-        'P7': P7_target
-    }
+
+    classification_target = tf.concat([P3_target[0],
+                                       P4_target[0],
+                                       P5_target[0],
+                                       P6_target[0],
+                                       P7_target[0]], axis=0)
+
+    centerness_target = tf.concat([P3_target[1],
+                                   P4_target[1],
+                                   P5_target[1],
+                                   P6_target[1],
+                                   P7_target[1]], axis=0)
+
+    regression_target = tf.concat([P3_target[2],
+                                   P4_target[2],
+                                   P5_target[2],
+                                   P6_target[2],
+                                   P7_target[2]], axis=0)
+
+    fg_mask = tf.concat([P3_target[3],
+                         P4_target[3],
+                         P5_target[3],
+                         P6_target[3],
+                         P7_target[3]], axis=0)
+
+    normalizer_value = tf.reduce_sum(fg_mask, keepdims=True)
+
+    return (classification_target,
+            centerness_target,
+            regression_target,
+            fg_mask,
+            normalizer_value)
 
 
 def load_data(h, w):
+    generate_centers(h, w)
+
     @tf.function
     def load_data_(example_proto):
         image, boxes_, class_ids = parse_example(example_proto)
@@ -126,7 +163,7 @@ def load_data(h, w):
             tf.clip_by_value(boxes_[:, 2] * w, 0, w),
             tf.clip_by_value(boxes_[:, 3] * h, 0, h)
         ], axis=-1)
-        image, boxes = flip_data(image, boxes, w)
+        image = image / 255.
         labels = tf.concat([boxes, class_ids], axis=-1)
         targets = compute_targets(labels, h, w)
         return image, targets
