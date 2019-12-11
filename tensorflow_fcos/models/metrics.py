@@ -6,7 +6,6 @@ class Metrics:
         self.metric_value = 0
 
     def update_state(self, value):
-        self.state.append(value)
         self.state += value
         self.count += 1
 
