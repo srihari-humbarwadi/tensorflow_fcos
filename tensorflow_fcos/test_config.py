@@ -51,9 +51,4 @@ if __name__ == '__main__':
 
             outputs = distributed_run(images, targets)
             if idx == i:
-                return outputs
-
-    print('****Dummy Output')
-    outputs = run(2000)
-    for tensor in outputs:
-        print(tensor.shape)
+                return outputs, targets

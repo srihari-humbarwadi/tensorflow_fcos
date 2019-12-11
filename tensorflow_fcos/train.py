@@ -24,7 +24,8 @@ config = {
     'epochs': 50,
     'learning_rate': 1e-4,
     'model_dir': './model_files',
-    'tensorboard_log_dir': './logs'
+    'tensorboard_log_dir': './logs',
+    'restore_parameters': False
 }
 fcos_model = FCOS(config)
 fcos_model.train()
