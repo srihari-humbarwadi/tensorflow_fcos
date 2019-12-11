@@ -4,11 +4,10 @@ import tensorflow as tf
 @tf.function
 def focal_loss(y_true,
                y_pred,
-               fg_mask,
+               normalizer_value,
                num_classes=10,
                alpha=0.25,
                gamma=2):
-    y_true = y_true[:, :, 0]
     y_true = tf.one_hot(
         tf.cast(y_true, dtype=tf.int32), depth=num_classes + 1)
     y_true = y_true[:, :, 1:]
@@ -22,24 +21,22 @@ def focal_loss(y_true,
             labels=y_true, logits=y_pred)
     f_loss = tf.reduce_sum(f_loss, axis=2)
     f_loss = tf.reduce_sum(f_loss, axis=1, keepdims=True)
-    normalizer_value = tf.reduce_sum(fg_mask, axis=1, keepdims=True)
     f_loss = f_loss / normalizer_value
     return f_loss
 
 
 @tf.function
-def centerness_loss(labels, logits, fg_mask):
+def centerness_loss(labels, logits, fg_mask, normalizer_value):
     bce_loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=labels, logits=logits)
-    bce_loss = bce_loss[:, :, 0] * fg_mask[:, :, 0]
+    bce_loss = bce_loss * tf.expand_dims(fg_mask, axis=-1)
     bce_loss = tf.reduce_sum(bce_loss, axis=1)
-    normalizer_value = tf.reduce_sum(fg_mask, axis=1)
     bce_loss = bce_loss / normalizer_value
     return bce_loss
 
 
 @tf.function
-def iou_loss(labels, logits, centers, fg_mask):
+def iou_loss(labels, logits, centers, fg_mask, normalizer_value):
     boxes_true = tf.concat([
         centers - labels[:, :, :2],
         centers + labels[:, :, 2:]], axis=-1)
@@ -57,14 +54,13 @@ def iou_loss(labels, logits, centers, fg_mask):
     boxes_pred_area = tf.reduce_prod(
         boxes_pred[:, :, 2:] - boxes_pred[:, :, :2], axis=2)
     union_area = tf.maximum(
-        boxes_true_area + boxes_pred_area - intersection_area, 1e-10)
+        boxes_true_area + boxes_pred_area - intersection_area, 1e-8)
     iou = tf.clip_by_value(intersection_area / union_area, 0.0, 1.0)
 
-    bg_mask = (1 - fg_mask) * 1e-7
+    bg_mask = (1 - fg_mask) * 1e-8
     iou_loss = iou + bg_mask
     iou_loss = -1 * tf.math.log(iou_loss)
     iou_loss = iou_loss * fg_mask
     iou_loss = tf.reduce_sum(iou_loss, axis=1, keepdims=True)
-    normalizer_value = tf.reduce_sum(fg_mask, axis=1, keepdims=True)
     iou_loss = iou_loss / normalizer_value
     return iou_loss
