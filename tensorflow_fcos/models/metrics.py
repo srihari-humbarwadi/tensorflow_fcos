@@ -1,15 +1,19 @@
-import numpy as np
-
-
 class Metrics:
     def __init__(self, name=''):
         self.name = name
-        self.state = []
+        self.state = 0
+        self.count = 0
         self.metric_value = 0
 
     def update_state(self, value):
         self.state.append(value)
-        self.metric_value = np.mean(self.state)
+        self.state += value
+        self.count += 1
 
     def result(self):
+        self.metric_value = self.state / self.count
         return self.metric_value
+
+    def reset_states(self):
+        self.state = []
+        self.metric_value = 0
