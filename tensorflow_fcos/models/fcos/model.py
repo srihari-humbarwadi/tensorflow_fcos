@@ -198,7 +198,8 @@ class FCOS:
         self.metrics = [
             Metrics(name='cls_loss'),
             Metrics(name='ctr_loss'),
-            Metrics(name='iou_loss')
+            Metrics(name='iou_loss'),
+            Metrics(name='total_loss')
         ]
 
     def restore_checkpoint(self, checkpoint_path):
@@ -318,11 +319,18 @@ class FCOS:
                     for images, targets in self.train_dataset:
                         cls_loss, ctr_loss, reg_loss = distributed_train_step(
                             images, targets)
-                        self._update_metrics(cls_loss, ctr_loss, reg_loss)
+                        total_loss = cls_loss + ctr_loss + reg_loss
+                        self._update_metrics(cls_loss,
+                                             ctr_loss,
+                                             reg_loss,
+                                             total_loss)
                         self._log_metrics()
                         self.iterations += 1
                         if self.iterations % 25 == 0:
-                            self._write_summaries(cls_loss, ctr_loss, reg_loss)
+                            self._write_summaries(cls_loss,
+                                                  ctr_loss,
+                                                  reg_loss,
+                                                  total_loss)
                     self._reset_metrics()
                     self._write_checkpoint()
                     self.epoch += 1
