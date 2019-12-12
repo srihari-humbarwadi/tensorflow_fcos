@@ -39,6 +39,7 @@ class FCOS:
             'batch_size',
             'epochs',
             'learning_rate',
+            'checkpoint_prefix',
             'model_dir',
             'tensorboard_log_dir',
             'restore_parameters'
@@ -194,12 +195,11 @@ class FCOS:
 
     def _initialize_metrics(self):
         pprint('****Initializing Metrics')
-        with self.distribute_strategy.scope():
-            self.metrics = [
-                Metrics(name='cls_loss'),
-                Metrics(name='ctr_loss'),
-                Metrics(name='iou_loss')
-            ]
+        self.metrics = [
+            Metrics(name='cls_loss'),
+            Metrics(name='ctr_loss'),
+            Metrics(name='iou_loss')
+        ]
 
     def restore_checkpoint(self, checkpoint_path):
         self.checkpoint.restore(checkpoint_path)
@@ -232,9 +232,8 @@ class FCOS:
                               reg_loss, step=self.iterations)
 
     def _write_checkpoint(self):
-        with self.distribute_strategy.scope():
-            self.checkpoint.save(os.path.join(self.model_dir,
-                                              self.checkpoint_prefix))
+        self.checkpoint.save(os.path.join(self.model_dir,
+                                          self.checkpoint_prefix))
 
     def _reset_metrics(self):
         for metric in self.metrics:
@@ -250,7 +249,8 @@ class FCOS:
             self.epoch * self.training_steps)
         metrics_dict = {
             'epoch': str(self.epoch) + '/' + str(self.epochs),
-            'batch': str(current_iteration) + '/' + str(self.training_steps)
+            'batch': str(current_iteration) + '/' + str(self.training_steps),
+            'iterations': str(self.iterations)
         }
         for metric in self.metrics:
             metrics_dict.update({metric.name: np.round(metric.result(), 3)})
@@ -321,7 +321,8 @@ class FCOS:
                         self._update_metrics(cls_loss, ctr_loss, reg_loss)
                         self._log_metrics()
                         self.iterations += 1
-                    self._write_summaries(cls_loss, ctr_loss, reg_loss)
+                        if self.iterations % 25 == 0:
+                            self._write_summaries(cls_loss, ctr_loss, reg_loss)
                     self._reset_metrics()
                     self._write_checkpoint()
                     self.epoch += 1
