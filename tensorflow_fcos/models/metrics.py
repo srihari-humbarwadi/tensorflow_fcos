@@ -14,5 +14,6 @@ class Metrics:
         return self.metric_value
 
     def reset_states(self):
-        self.state = []
+        self.state = 0
+        self.count = 0
         self.metric_value = 0
