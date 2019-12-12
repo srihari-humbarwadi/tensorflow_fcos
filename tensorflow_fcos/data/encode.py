@@ -140,7 +140,7 @@ def compute_targets(labels, h, w):
                          P6_target[3],
                          P7_target[3]], axis=0)
 
-    normalizer_value = tf.reduce_sum(fg_mask, keepdims=True)
+    normalizer_value = tf.maximum(tf.reduce_sum(fg_mask, keepdims=True), 1.0)
 
     return (classification_target,
             centerness_target,
