@@ -22,7 +22,7 @@ config = {
     'data_dir': data_dir,
     'batch_size': 8,
     'epochs': 50,
-    'learning_rate': 4e-4,
+    'learning_rate': 2e-4,
     'checkpoint_prefix': 'ckpt',
     'model_dir': './model_files',
     'tensorboard_log_dir': './logs',
