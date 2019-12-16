@@ -42,6 +42,7 @@ class FCOS:
             'checkpoint_prefix',
             'model_dir',
             'tensorboard_log_dir',
+            'log_after',
             'restore_parameters'
         ]
         for attr in attr_list:
@@ -106,7 +107,7 @@ class FCOS:
 
         for i in range(4):
             x = conv_block(x, 256, 3, kernel_init=kernel_init,
-                           bn_act=False, name_prefix='c_head_{}'.format(i))
+                           bn_act=True, name_prefix='c_head_{}'.format(i))
         classification_logits = conv_block(x, self.num_classes,
                                            3, kernel_init=kernel_init,
                                            bias_init=bias_init, bn_act=False,
@@ -130,7 +131,7 @@ class FCOS:
 
         for i in range(4):
             x = conv_block(x, 256, 3, kernel_init=kernel_init,
-                           bn_act=False, name_prefix='r_head_{}'.format(i))
+                           bn_act=True, name_prefix='r_head_{}'.format(i))
         regression_logits = conv_block(x, 4, 3, kernel_init=kernel_init,
                                        bn_act=False, name_prefix='reg_logits')
         regression_logits = Reshape(target_shape=[-1, 4])(regression_logits)
@@ -170,22 +171,23 @@ class FCOS:
 
     def _build_datasets(self):
         pprint('****Building Datasets')
-        with self.distribute_strategy.scope():
-            self.train_dataset, self.val_dataset, \
-                num_train_images, num_val_images =  \
-                self.dataset_fn(self.image_height,
-                                self.image_width,
-                                self.data_dir,
-                                self.batch_size)
-            self.train_dataset = \
-                self.distribute_strategy.experimental_distribute_dataset(
-                    self.train_dataset)
-            self.val_dataset = \
-                self.distribute_strategy.experimental_distribute_dataset(
-                    self.val_dataset)
+        if self.mode == 'train':
+            with self.distribute_strategy.scope():
+                self.train_dataset, self.val_dataset, \
+                    num_train_images, num_val_images =  \
+                    self.dataset_fn(self.image_height,
+                                    self.image_width,
+                                    self.data_dir,
+                                    self.batch_size)
+                self.train_dataset = \
+                    self.distribute_strategy.experimental_distribute_dataset(
+                        self.train_dataset)
+                self.val_dataset = \
+                    self.distribute_strategy.experimental_distribute_dataset(
+                        self.val_dataset)
 
-            self.training_steps = num_train_images // self.batch_size
-            self.val_steps = num_val_images // self.batch_size
+                self.training_steps = num_train_images // self.batch_size
+                self.val_steps = num_val_images // self.batch_size
         self._centers = tf.concat(all_centers[3:], axis=0)
 
     def _build_optimizer(self):
@@ -216,15 +218,18 @@ class FCOS:
                     self.model_dir)
                 self.restore_status = self.checkpoint.restore(
                     self.latest_checkpoint)
+                pprint('****Checkpoint: ' + self.latest_checkpoint)
                 pprint('****Restored Parameters')
 
     def _create_summary_writer(self):
         self.summary_writer = tf.summary.create_file_writer(
             logdir=self.tensorboard_log_dir)
 
-    def _write_summaries(self, cls_loss, ctr_loss, reg_loss):
+    def _write_summaries(self, cls_loss, ctr_loss, reg_loss, total_loss):
         pprint('****Writing Summaries')
         with self.summary_writer.as_default():
+            tf.summary.scalar('total_loss',
+                              total_loss, step=self.iterations)
             tf.summary.scalar('cls_loss',
                               cls_loss, step=self.iterations)
             tf.summary.scalar('ctr_loss',
@@ -240,14 +245,14 @@ class FCOS:
         for metric in self.metrics:
             metric.reset_states()
 
-    def _update_metrics(self, cls_loss, ctr_loss, reg_loss):
+    def _update_metrics(self, cls_loss, ctr_loss, reg_loss, total_loss):
         self.metrics[0].update_state(cls_loss.numpy())
         self.metrics[1].update_state(ctr_loss.numpy())
         self.metrics[2].update_state(reg_loss.numpy())
+        self.metrics[3].update_state(total_loss.numpy())
 
     def _log_metrics(self):
-        current_iteration = self.iterations % (
-            self.epoch * self.training_steps)
+        current_iteration = self.iterations % self.training_steps
         metrics_dict = {
             'epoch': str(self.epoch) + '/' + str(self.epochs),
             'batch': str(current_iteration) + '/' + str(self.training_steps),
@@ -326,7 +331,7 @@ class FCOS:
                                              total_loss)
                         self._log_metrics()
                         self.iterations += 1
-                        if self.iterations % 25 == 0:
+                        if self.iterations % self.log_after == 0:
                             self._write_summaries(cls_loss,
                                                   ctr_loss,
                                                   reg_loss,

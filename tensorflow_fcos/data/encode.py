@@ -16,10 +16,6 @@ def flip_data(image, boxes, w):
     return image, boxes
 
 
-def random_jitter(image):
-    return image
-
-
 def compute_area(boxes):
     h_ = boxes[:, 2] - boxes[:, 0]
     w_ = boxes[:, 3] - boxes[:, 1]
@@ -163,7 +159,8 @@ def load_data(h, w):
             tf.clip_by_value(boxes_[:, 2] * w, 0, w),
             tf.clip_by_value(boxes_[:, 3] * h, 0, h)
         ], axis=-1)
-        image = image / 255.
+        image, boxes = flip_data(image, boxes, w)
+        image = image[:, :, ::-1] - tf.constant([103.939, 116.779, 123.68])
         labels = tf.concat([boxes, class_ids], axis=-1)
         targets = compute_targets(labels, h, w)
         return image, targets

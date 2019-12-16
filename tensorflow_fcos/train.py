@@ -21,12 +21,13 @@ config = {
     'dataset_fn': dataset_fn,
     'data_dir': data_dir,
     'batch_size': 8,
-    'epochs': 50,
-    'learning_rate': 2e-4,
+    'epochs': 25,
+    'learning_rate': 5e-4,
     'checkpoint_prefix': 'ckpt',
     'model_dir': './model_files',
     'tensorboard_log_dir': './logs',
-    'restore_parameters': False
+    'log_after': 20,
+    'restore_parameters': True
 }
 fcos_model = FCOS(config)
 fcos_model.train()
