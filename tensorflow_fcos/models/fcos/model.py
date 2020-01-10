@@ -78,7 +78,7 @@ class FCOS:
             M5_upsampled = upsample_like(M5, C4, name='M5_upsampled')
 
             M4 = conv_block(C4, 256, 1, bn_act=False, name_prefix='C4')
-            M4 = tf.keras.layers.Add(name='M4_M5_add')([M4, M5_upsampled])
+            M4 = Add(name='M4_M5_add')([M4, M5_upsampled])
             P4 = conv_block(M4, 256, 3, bn_act=False, name_prefix='P4')
             M4_upsampled = upsample_like(M4, C3, name='M4_upsampled')
 
